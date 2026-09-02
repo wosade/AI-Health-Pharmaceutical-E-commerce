@@ -1,65 +1,33 @@
 import os
-import pymysql
+import httpx
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-
-def _get_conn():
-    return pymysql.connect(
-        host=os.getenv("MYSQL_HOST", "localhost"),
-        port=int(os.getenv("MYSQL_PORT", "3306")),
-        user=os.getenv("MYSQL_USER", "root"),
-        password=os.getenv("MYSQL_PASSWORD", ""),
-        database=os.getenv("MYSQL_DATABASE", "medicine"),
-        charset="utf8mb4",
-        cursorclass=pymysql.cursors.DictCursor,
-    )
+JAVA_BACKEND = os.getenv("JAVA_BACKEND_URL", "http://localhost:8080")
 
 
-# ==================== 商品搜索 ====================
+def _get(path: str, **params) -> dict | list:
+    url = f"{JAVA_BACKEND}{path}"
+    params = {k: v for k, v in params.items() if v is not None}
+    with httpx.Client(timeout=10) as client:
+        resp = client.get(url, params=params)
+        resp.raise_for_status()
+        return resp.json()["data"]
+
 
 class ProductSearchArgs(BaseModel):
     keyword: str | None = Field(default=None, description="搜索关键词")
-    category_name: str | None = Field(default=None, description="分类名称")
     page_num: int = Field(default=1, description="页码")
     page_size: int = Field(default=10, description="每页数量")
 
 
 @tool(args_schema=ProductSearchArgs)
-def search_client_products(keyword: str | None = None, category_name: str | None = None,
+def search_client_products(keyword: str | None = None,
                            page_num: int = 1, page_size: int = 10) -> dict:
-    """搜索客户端商品。用户想找药、按用途选商品时调用。"""
-    conn = _get_conn()
-    try:
-        conditions = ["p.is_delete = 0", "p.status = 1"]
-        params = []
-        if keyword:
-            conditions.append("(p.name LIKE %s OR p.brand LIKE %s)")
-            params.extend([f"%{keyword}%", f"%{keyword}%"])
-        if category_name:
-            conditions.append("c.name = %s")
-            params.append(category_name)
-        where = " AND ".join(conditions)
-        offset = (page_num - 1) * page_size
-        with conn.cursor() as cur:
-            cur.execute(
-                f"SELECT COUNT(*) as total FROM product p "
-                f"LEFT JOIN category c ON p.category_id = c.id WHERE {where}", params
-            )
-            total = cur.fetchone()["total"]
-            cur.execute(
-                f"SELECT p.id, p.name, p.price, p.stock, p.image_url, p.description "
-                f"FROM product p LEFT JOIN category c ON p.category_id = c.id "
-                f"WHERE {where} ORDER BY p.create_time DESC LIMIT %s OFFSET %s",
-                params + [page_size, offset]
-            )
-            rows = cur.fetchall()
-        return {"total": total, "page_num": page_num, "page_size": page_size, "rows": rows}
-    finally:
-        conn.close()
+    """搜索客户端商品。用户想找药、按症状/用途选商品时调用。"""
+    rows = _get("/api/products", keyword=keyword or "")
+    return {"total": len(rows), "page_num": 1, "page_size": len(rows), "rows": rows}
 
-
-# ==================== 订单查询 ====================
 
 class OrderDetailArgs(BaseModel):
     order_no: str = Field(description="订单编号")
@@ -68,29 +36,8 @@ class OrderDetailArgs(BaseModel):
 @tool(args_schema=OrderDetailArgs)
 def get_client_order(order_no: str) -> dict:
     """查询客户端用户的订单详情。"""
-    conn = _get_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, order_no, order_status, total_amount, pay_amount, receiver_name, "
-                "receiver_phone, receiver_address, create_time, pay_time "
-                "FROM `order` WHERE order_no = %s AND is_delete = 0", (order_no,)
-            )
-            order = cur.fetchone()
-            if not order:
-                return {"error": "订单不存在"}
-            cur.execute(
-                "SELECT product_name, product_price, quantity, product_image "
-                "FROM order_item WHERE order_no = %s", (order_no,)
-            )
-            items = cur.fetchall()
-            order["items"] = items
-            return order
-    finally:
-        conn.close()
+    return _get(f"/api/orders/{order_no}")
 
-
-# ==================== 问诊卡工具 ====================
 
 class SendQuestionnaireArgs(BaseModel):
     questions: list[str] = Field(description="追问问题列表，最多5个")
@@ -107,8 +54,6 @@ def send_questionnaire_card(questions: list[str], title: str = "补充问诊信�
         "message": "请用户填写以下问诊信息"
     }
 
-
-# ==================== 处方确认卡 ====================
 
 class SendPrescriptionArgs(BaseModel):
     drug_name: str = Field(description="推荐药品名称")
@@ -127,8 +72,6 @@ def send_prescription_card(drug_name: str, reason: str, price: float = 0) -> dic
         "message": f"推荐药品：{drug_name}，{reason}"
     }
 
-
-# ==================== 导航工具 ====================
 
 @tool
 def open_user_patient_list() -> dict:
