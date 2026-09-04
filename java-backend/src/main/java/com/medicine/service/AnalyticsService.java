@@ -7,18 +7,22 @@ import com.medicine.entity.User;
 import com.medicine.mapper.OrderMapper;
 import com.medicine.mapper.ProductMapper;
 import com.medicine.mapper.UserMapper;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class AnalyticsService {
     private final OrderMapper orderMapper;
     private final ProductMapper productMapper;
     private final UserMapper userMapper;
+
+    public AnalyticsService(OrderMapper orderMapper, ProductMapper productMapper, UserMapper userMapper) {
+        this.orderMapper = orderMapper;
+        this.productMapper = productMapper;
+        this.userMapper = userMapper;
+    }
 
     public Map<String, Object> summary() {
         Map<String, Object> data = new HashMap<>();

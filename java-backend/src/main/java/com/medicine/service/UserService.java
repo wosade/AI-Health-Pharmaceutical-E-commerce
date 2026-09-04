@@ -3,14 +3,16 @@ package com.medicine.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.medicine.entity.User;
 import com.medicine.mapper.UserMapper;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class UserService {
     private final UserMapper userMapper;
+
+    public UserService(UserMapper userMapper) {
+        this.userMapper = userMapper;
+    }
 
     public List<User> search(String keyword) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
