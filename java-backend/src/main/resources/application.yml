@@ -2,18 +2,31 @@ server:
   port: 8080
 
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.mcp.server.autoconfigure.McpServerAutoConfiguration
+      - org.springframework.ai.mcp.server.autoconfigure.McpWebMvcServerAutoConfiguration
+      - org.springframework.ai.mcp.client.autoconfigure.McpClientAutoConfiguration
+      - org.springframework.ai.mcp.client.autoconfigure.McpToolCallbackAutoConfiguration
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:192.168.140.139}:${MYSQL_PORT:3306}/${MYSQL_DB:medicine}?useSSL=false&serverTimezone=Asia/Shanghai
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:123}
   ai:
     openai:
-      api-key: ${DASHSCOPE_API_KEY:}
+      api-key: sk-ws-H.PMPREIY.wlU8.MEQCIHqhbVSEyVYNQ8c_hzoi6olligVVyznkYGsSpVTHG6dFAiB4WX3XqH3STedp0f5F0_8wOe4vgfU7HI6tramJxxQnvQ
       base-url: https://dashscope.aliyuncs.com/compatible-mode
       chat:
         options:
           model: qwen-plus
           temperature: 0.1
+      embedding:
+        options:
+          model: text-embedding-v2
+    mcp:
+      server:
+        name: medicine-ai-mcp
+        version: 1.0.0
 
 mybatis-plus:
   configuration:
