@@ -17,6 +17,7 @@ public class AgentService {
     private final ChatClient.Builder chatClientBuilder;
     private final ClientTools clientTools;
     private final AdminTools adminTools;
+    private final RagService ragService;
     private final ObjectMapper objectMapper;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -83,10 +84,12 @@ public class AgentService {
     public AgentService(ChatClient.Builder chatClientBuilder,
                         ClientTools clientTools,
                         AdminTools adminTools,
+                        RagService ragService,
                         ObjectMapper objectMapper) {
         this.chatClientBuilder = chatClientBuilder;
         this.clientTools = clientTools;
         this.adminTools = adminTools;
+        this.ragService = ragService;
         this.objectMapper = objectMapper;
     }
 
@@ -109,6 +112,11 @@ public class AgentService {
             try {
                 String route = routeGateway(question);
                 String prompt = "medical_agent".equals(route) ? MEDICAL_PROMPT : SERVICE_PROMPT;
+
+                String ragContext = ragService.searchAsContext(question, 3);
+                if (!ragContext.isEmpty()) {
+                    prompt = prompt + ragContext;
+                }
 
                 ChatClient client = chatClientBuilder
                         .defaultTools(clientTools)
